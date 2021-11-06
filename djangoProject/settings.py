@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 from pathlib import Path
 import os
+import datetime
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -36,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'blog',
     'dtoken',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -98,7 +101,7 @@ WSGI_APPLICATION = 'djangoProject.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'dadablog',
+        'NAME': 'library',
         'USER': 'root',
         'PASSWORD': '123456',
         'HOST': '127.0.0.1',
@@ -152,3 +155,17 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 TOKEN_KEY = '123456'
 
+JWT_AUTH = {
+    # 设置token有效时间
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(seconds=60 * 60 * 24)
+}
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated'
+    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication'
+    )
+}

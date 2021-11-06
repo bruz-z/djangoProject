@@ -1,49 +1,34 @@
-import hashlib
-import json
 import time
-
 import jwt
-from django.http import JsonResponse
-from blog.models import UserProfile
+from blog.models import User
 from djangoProject import settings
+import json
+from django.http import JsonResponse
+from django.contrib.auth import authenticate, login
+from rest_framework_jwt.settings import api_settings
+
 
 # Create your views here.
-def tokens(request):
-    # 即登录
+def tokens(request):  # api/login
     if request.method != 'POST':
-        result = {'code': 10200, 'error': 'Please us post'}
+        result = {'code': 0, 'msg': 'Please use post'}
         return JsonResponse(result)
-
-    # 获取body中的数据
     json_str = request.body
-    if not json_str:
-        result = {'code': 10201, 'error': 'Please give me data'}
-        return JsonResponse(result)
     json_obj = json.loads(json_str)
-
     username = json_obj.get('username')
     password = json_obj.get('password')
-    if not username:
-        result = {'code': 10202, 'error': 'Give me username !!!'}
-        return JsonResponse(result)
-    if not password:
-        result = {'code': 10203, 'error': 'Give me password !!!'}
-        return JsonResponse(result)
-
-    user = UserProfile.objects.filter(username=username)
-    if not user:
-        result = {'code': 10204, 'error': 'Username or password is wrong !'}
-        return JsonResponse(result)
-    user = user[0]
-    # 对比密码
-    p_m = hashlib.md5()
-    p_m.update(password.encode())
-    if p_m.hexdigest() != user.password:
-        result = {'code': 10205, 'error': 'Username or password is wrong !!'}
-        return JsonResponse(result)
-    # 生成token
-    token = make_token(username)
-    result = {'code': 200, 'username': username, 'data': {'token': token}}  # 使用token.decode()不行，不知道为什么
+    if username is None or password is None:
+        return JsonResponse({'code': 0, 'msg': '请求参数错误'})
+    is_login = authenticate(request, username=username, password=password)
+    if is_login is None:
+        return JsonResponse({'code': 0, 'msg': '账号或密码错误'})
+    login(request, is_login)
+    jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+    jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+    payload = jwt_payload_handler(is_login)
+    token = jwt_encode_handler(payload)
+    result = {'code': 1, 'msg': "login success!", 'data':
+        {'token': token}}
     return JsonResponse(result)
 
 

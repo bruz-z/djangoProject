@@ -10,11 +10,11 @@
       <jdbc-url>jdbc:mysql://127.0.0.1:3306/dadablog</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="dadablog@localhost" uuid="ca4a5061-c17b-4a87-b349-2abc8165a3a2">
+    <data-source source="LOCAL" name="library@localhost" uuid="aa49eaff-2506-4adc-ad8a-1d2e26b3194f">
       <driver-ref>mysql.8</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>com.mysql.cj.jdbc.Driver</jdbc-driver>
-      <jdbc-url>jdbc:mysql://localhost:3306/dadablog</jdbc-url>
+      <jdbc-url>jdbc:mysql://localhost:3306/library</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>
