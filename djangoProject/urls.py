@@ -1,14 +1,15 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.conf.urls.static import static
-from django.conf import settings
 from blog import views
-from dtoken import views as dtoken_views
+from rest_framework_simplejwt.views import TokenRefreshView
+from blog.views import MyObtainTokenPairView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/login', MyObtainTokenPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/user', views.UserViews.as_view()),
-    path('api/login', dtoken_views.tokens),
+    path('api/register', views.register),
     path('api/user/', include('blog.urls')),
     path('api/users', views.user_list),
     path('api/book/', include('blog.urls')),

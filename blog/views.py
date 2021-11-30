@@ -1,40 +1,38 @@
 import json
 import datetime
-from django.forms import model_to_dict
-from django.utils.decorators import method_decorator
-from .models import *
+from .serializers import *
 from django.http import JsonResponse
-from django.views import View
-from tools.logging_check import logging_check
+from rest_framework.views import APIView
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_jwt.authentication import JSONWebTokenAuthentication
+from rest_framework.permissions import *
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-# @logging_check
+
+class MyObtainTokenPairView(TokenObtainPairView):  # api/login
+    permission_classes = (AllowAny,)
+    serializer_class = MyTokenObtainPairSerializer
+
+
+@api_view(['GET'])
+@permission_classes((IsAdminUser,))
+@authentication_classes((JWTAuthentication,))
 def user_list(request):  # api/users
-    if request.method != 'GET':
-        result = {'code': 0, 'msg': 'use GET！'}
-        return JsonResponse(result)
     users = User.objects.all()
-    tmp = []
-    for user in users:
-        user = model_to_dict(user)
-        del user['Password'], user['Email'], user['Nickname']
-        tmp.append(user)
-    result = {'code': 0, 'msg': 'acquire user list successfully!', 'data': tmp}
+    serializer = UserSerializer(users, many=True)
+    result = {'code': 1, 'msg': '成功获取', 'data': serializer.data}
     return JsonResponse(result)
 
 
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
-@authentication_classes((JSONWebTokenAuthentication,))
+@authentication_classes((JWTAuthentication,))
 def change_password(request):  # api/user/password
     json_str = request.body
     json_obj = json.loads(json_str)
     user_id = json_obj.get('user_id')
     password_new = json_obj.get('password')
     password_old = json_obj.get('old_password')
-    #user = request.myuser
     try:
         user = User.objects.get(Id=user_id)
     except Exception:
@@ -50,8 +48,43 @@ def change_password(request):  # api/user/password
         return JsonResponse(result)
 
 
-class UserViews(View):  # api/user
-    def get(self, request, username=None):
+@api_view(['POST'])
+@permission_classes((AllowAny,))
+@authentication_classes(())
+def register(request):  # api/register
+    json_str = request.body
+    json_obj = json.loads(json_str)
+    username = json_obj.get('username')
+    password = json_obj.get('password')
+    email = json_obj.get('email')
+    nickname = json_obj.get('nickname')
+    old_user = User.objects.filter(Username=username)
+    if old_user:
+        result = {'code': 0, 'msg': 'username already exist!'}
+        return JsonResponse(result)
+    old_email = User.objects.filter(Email=email)
+    if old_email:
+        result = {'code': 0, 'msg': 'email already registered!'}
+        return JsonResponse(result)
+    # 创建用户
+    count = User.objects.count()
+    try:
+        User.objects.create(Id=count + 1, Username=username, Password=password,
+                            Nickname=nickname, Email=email)
+    except Exception as e:
+        print(e)
+        result = {'code': 0, 'msg': 'create failed!'}
+        return JsonResponse(result)
+    result = {'code': 1, 'msg': 'create success!', 'data': count + 1}
+    return JsonResponse(result)
+
+
+class UserViews(APIView):  # api/user
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
         user_id = request.GET.get('user_id')
         try:
             user = User.objects.get(Id=user_id)
@@ -62,38 +95,10 @@ class UserViews(View):  # api/user
                   'data': {'username': user.Username, 'nickname': user.Nickname, 'email': user.Email}}
         return JsonResponse(result)
 
-    def post(self, request):
-        json_str = request.body
-        json_obj = json.loads(json_str)
-        username = json_obj.get('username')
-        password = json_obj.get('password')
-        email = json_obj.get('email')
-        nickname = json_obj.get('nickname')
-        old_user = User.objects.filter(Username=username)
-        if old_user:
-            result = {'code': 0, 'msg': 'username already exist!'}
-            return JsonResponse(result)
-        old_email = User.objects.filter(Email=email)
-        if old_email:
-            result = {'code': 0, 'msg': 'email already registered!'}
-            return JsonResponse(result)
-        # 创建用户
-        count = User.objects.count()
-        try:
-            User.objects.create(Id=count + 1, Username=username, Password=password,
-                                Nickname=nickname, Email=email)
-        except Exception as e:
-            print(e)
-            result = {'code': 0, 'msg': 'msg!'}
-            return JsonResponse(result)
-        result = {'code': 1, 'msg': 'create success!', 'data': count + 1}
-        return JsonResponse(result)
 
-    #@method_decorator(logging_check)
-    def put(self, request, username=None):
+    def put(self, request):
         json_str = request.body
         json_obj = json.loads(json_str)
-        # user = request.myuser
         user_id = json_obj.get('user_id')
         email = json_obj.get('email')
         nickname = json_obj.get('nickname')
@@ -111,6 +116,9 @@ class UserViews(View):  # api/user
         return JsonResponse({'code': 1, 'msg': 'change success!'})
 
 
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes((JWTAuthentication,))
 def borrow_book(request):  # api/book/borrow
     json_str = request.body
     json_obj = json.loads(json_str)
@@ -128,23 +136,26 @@ def borrow_book(request):  # api/book/borrow
         return JsonResponse(result)
     count = Record.objects.count()
     try:
-        record = Record.objects.get(BookId=book_id, UserId=user_id)
+        record = Record.objects.get(BookId_id=book_id, UserId_id=user_id)
     except:
-        Record.objects.create(Id=count + 1, BookId=book_id, UserId=user_id)
+        Record.objects.create(Id=count + 1, BookId_id=book_id, UserId_id=user_id)
         result = {'code': 1, 'msg': 'borrow success!',
                   'data': {'record_id': count + 1, 'borrow_date': datetime.datetime.now()}}
         return JsonResponse(result)
-    if record.ReturnDate is None:  # 为啥这里就可以record.
+    if record.ReturnDate is None:  
         result = {'code': 0, 'msg': 'the book has been borrowed!'}
         return JsonResponse(result)
     else:
-        Record.objects.create(Id=count + 1, BookId=book_id, UserId=user_id)
+        Record.objects.create(Id=count + 1, BookId_id=book_id, UserId_id=user_id)
     result = {'code': 1, 'msg': 'borrow success!',
               'data': {'record_id': count + 1, 'borrow_date': datetime.datetime.now()}}
     return JsonResponse(result)
 
 
-class BookViews(View):  # api/book
+class BookViews(APIView):  # api/book
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAdminUser,)
+
     def get(self, request):
         book_id = request.GET.get('book_id')
         try:
@@ -209,39 +220,35 @@ class BookViews(View):  # api/book
         return JsonResponse(result)
 
 
+@api_view(['GET'])
+@permission_classes((IsAdminUser,))
+@authentication_classes((JWTAuthentication,))
 def check_status(request):  # api/book/status
-    if request.method != 'GET':
-        result = {'code': 0, 'msg': 'use GET！'}
-        return JsonResponse(result)
     book_id = request.GET.get('book_id')
-    try:
-        record = Record.objects.get(BookId=book_id)
-    except:
+    record = Record.objects.filter(BookId=book_id)
+    if not record:
         result = {'code': 0, 'msg': 'the book is not exist!'}
         return JsonResponse(result)
+    serializer = RecordSerializer(record, many=True)
     result = {'code': 1, 'msg': 'acquire record successfully!',
-              'data': {'user_id': record.UserId, 'borrow_date': record.BorrowDate, 'return_date': record.ReturnDate}}
+              'data': serializer.data}
     return JsonResponse(result)
 
 
+@api_view(['GET'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes((JWTAuthentication,))
 def book_list(request):  # api/books
-    if request.method != 'GET':
-        result = {'code': 0, 'msg': 'use GET！'}
-        return JsonResponse(result)
     books = Book.objects.all()
-    tmp = []
-    for book in books:
-        book = model_to_dict(book)
-        del book['Place'], book['Introduction'], book['Author'], book['Price']
-        tmp.append(book)
-    result = {'code': 0, 'msg': 'acquire book list successfully!', 'data': tmp}
+    serializer = BookSerializer(books, many=True)
+    result = {'code': 1, 'msg': '成功获取', 'data': serializer.data}
     return JsonResponse(result)
 
 
+@api_view(['GET'])
+@permission_classes((IsAdminUser,))
+@authentication_classes((JWTAuthentication,))
 def book_records(request):  # api/book/records
-    if request.method != 'GET':
-        result = {'code': 0, 'msg': 'use GET！'}
-        return JsonResponse(result)
     book_id = request.GET.get('book_id')
     records = Record.objects.filter(BookId=book_id)
     if not records:
@@ -249,7 +256,7 @@ def book_records(request):  # api/book/records
         return JsonResponse(result)
     tmp = []  # 获取对应用户名
     for record in records:
-        user = User.objects.get(Id=record.UserId)
+        user = User.objects.get(Id=record.UserId_id)
         tmp.append(user.Username)
     ls = []  # 获取对应借还记录
     i = 0
@@ -263,10 +270,10 @@ def book_records(request):  # api/book/records
     return JsonResponse(result)
 
 
+@api_view(['GET'])
+@permission_classes((IsAdminUser,))
+@authentication_classes((JWTAuthentication,))
 def user_records(request):  # api/user/books
-    if request.method != 'GET':
-        result = {'code': 0, 'msg': 'use GET！'}
-        return JsonResponse(result)
     user_id = request.GET.get('user_id')
     records = Record.objects.filter(UserId=user_id)
     if not records:
@@ -274,7 +281,7 @@ def user_records(request):  # api/user/books
         return JsonResponse(result)
     tmp = []  # 获取对应书名
     for record in records:
-        book = Book.objects.get(Id=record.BookId)
+        book = Book.objects.get(Id=record.BookId_id)
         tmp.append(book.Name)
     ls = []  # 获取对应借还记录
     i = 0
@@ -288,6 +295,9 @@ def user_records(request):  # api/user/books
     return JsonResponse(result)
 
 
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes((JWTAuthentication,))
 def book_return(request):  # api/book/return
     json_str = request.body
     json_obj = json.loads(json_str)
@@ -313,10 +323,10 @@ def book_return(request):  # api/book/return
     return JsonResponse(result)
 
 
+@api_view(['GET'])
+@permission_classes((IsAdminUser,))
+@authentication_classes((JWTAuthentication,))
 def book_record(request):  # api/book/record
-    if request.method != 'GET':
-        result = {'code': 0, 'msg': 'use GET！'}
-        return JsonResponse(result)
     record_id = request.GET.get('record_id')
     try:
         record = Record.objects.get(Id=record_id)
@@ -324,6 +334,6 @@ def book_record(request):  # api/book/record
         result = {'code': 0, 'msg': 'the record is not exist!'}
         return JsonResponse(result)
     result = {'code': 1, 'msg': 'acquire record successfully!',
-              'data': {'book_id': record.BookId, 'user_id': record.UserId,
+              'data': {'book_id': record.BookId_id, 'user_id': record.UserId_id,
                        'borrow_date': record.BorrowDate, 'return_date': record.ReturnDate}}
     return JsonResponse(result)
